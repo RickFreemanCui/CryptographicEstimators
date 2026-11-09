@@ -167,6 +167,9 @@ def balanced_regular(n, k, w, depth=3, max_evaluations=None, max_seconds=None,
 
 def estimate(n,k,w,max_evaluations=None,max_seconds=None,include_sd=True):
     """Strict portfolio: an incomplete component prevents acceptance of the minimum."""
+    if not (0<w<k<n and n%w==0 and w*log2(n/w)<n-k):
+        raise SearchIncomplete("Strict portfolio requires the declared near-unique binary RSD regime",
+                               dict(status="unsupported_model",instance=[n,k,w]))
     from .regsd_problem import RegSDProblem
     from .RegSDAlgorithms import RegularISDPerm, CCJLin, CCJ, SDAttack
     problem=RegSDProblem(n,k,w)

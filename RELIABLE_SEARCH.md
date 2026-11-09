@@ -42,6 +42,8 @@ Only the strict supported binary portfolio has the completion semantics above.
 
 These are modeled log2 bit-operation costs. The strict API fixes unlimited
 memory, memory-access cost 0, and applies the vector-length conversion once.
+It requires `w*log2(N/w) < N-k`, the near-unique regime used in this project;
+many-solution regimes require separate solution-count and applicability analysis.
 The regular models follow ES24, Section 4.3 and Appendix A.1:
 <https://eprint.iacr.org/2023/1568>.
 They retain continuous `v=(k-w+ell)/w`; the remaining per-block length rounding,

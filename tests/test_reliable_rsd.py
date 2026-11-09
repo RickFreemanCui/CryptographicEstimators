@@ -55,6 +55,7 @@ class ReliableSearchTests(unittest.TestCase):
         self.assertEqual(caught.exception.report['status'],'budget_exhausted')
         with self.assertRaises(SearchIncomplete):balanced_regular(3454,1850,691)
         with self.assertRaises(SearchIncomplete):estimate(96,48,16,max_evaluations=1)
+        with self.assertRaises(SearchIncomplete):estimate(96,80,16)
 
     def test_small_full_portfolio_completes(self):
         result=estimate(96,48,16,max_evaluations=1000000)
