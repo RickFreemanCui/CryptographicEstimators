@@ -8,6 +8,16 @@ from cryptographic_estimators.SDEstimator.sd_algorithm import SDAlgorithm
 
 
 class ReliableSearchTests(unittest.TestCase):
+    def test_ball_collision_full_domain_accounts_for_window_errors_and_endpoint(self):
+        from cryptographic_estimators.SDEstimator import SDProblem
+        from cryptographic_estimators.SDEstimator.SDAlgorithms import BallCollision
+        algo=BallCollision(SDProblem(48,24,8,nsolutions=0),bit_complexities=0,full_domain=True)
+        r=algo.r()
+        point=dict(p=0,pl=4,l=24,r=r)
+        self.assertFalse(algo._are_parameters_invalid(point))
+        self.assertIn(point,list(algo._valid_choices()))
+        self.assertTrue(math.isfinite(algo._time_and_memory_complexity(point)[0]))
+
     def test_vectorized_regular_search_matches_independent_scalar_enumeration(self):
         for cls, depth in [(RegularISDEnum,1),(RegularISDRep,3)]:
             algo=cls(RegSDProblem(48,24,8))

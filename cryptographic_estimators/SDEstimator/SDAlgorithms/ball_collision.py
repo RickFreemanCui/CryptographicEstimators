@@ -138,10 +138,10 @@ class BallCollision(SDAlgorithm):
         for p in range(start_p, min(w // 2, new_ranges["p"]["max"]) + 1, 1 if self.full_domain else 2):
             for l in range(
                 new_ranges["l"]["min"],
-                min(n - k - (w - 2 * p), new_ranges["l"]["max"]) + 1,
+                min(n - k if self.full_domain else n - k - (w - 2 * p), new_ranges["l"]["max"]) + 1,
             ):
                 for pl in range(
-                    new_ranges["pl"]["min"],
+                    max(new_ranges["pl"]["min"], (w-2*p-(n-k-l)+1)//2) if self.full_domain else new_ranges["pl"]["min"],
                     min(l // 2, new_ranges["pl"]["max"], (w - 2 * p) // 2) + 1,
                 ):
                     indices = {

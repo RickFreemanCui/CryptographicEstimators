@@ -29,6 +29,8 @@ report; it must not be replaced by another algorithm's higher cost.
   overwrite an earlier expansion. Strict `full_domain=True` bypasses this
   heuristic controller, removes the BJMM depth-2 ell window, uses natural
   supported bounds, and includes the omitted Ball-Collision odd-p points.
+  Ball-Collision also includes ell values made feasible by the errors in its
+  window (`pl`), including ell=N-k when the residual outside weight is zero.
 * Negative BJMM merge-bit counts are rejected explicitly, rather than producing
   huge float powers or an overflow. Exact binomial memoization changes runtime,
   not the formulas. A failed component is not silently omitted by the strict API.
