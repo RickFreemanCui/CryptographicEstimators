@@ -113,6 +113,8 @@ class BJMM(SDAlgorithm):
             return
 
         self.BJMM_depth_3._find_optimal_parameters()
+        self.search_report = {"status": "complete" if self.full_domain else "heuristic",
+                              "algorithm": "BJMM", "children": [self.BJMM_depth_2.search_report, self.BJMM_depth_3.search_report]}
         if self.BJMM_depth_2.time_complexity() > self.BJMM_depth_3.time_complexity():
             self._optimal_parameters["depth"] = 3
         else:
@@ -193,7 +195,7 @@ class BJMMd2(SDAlgorithm):
         n, k, w = self.problem.get_parameters()
         s = self.full_domain
         self.set_parameter_ranges("p", 0, min_max(35, w, s))
-        self.set_parameter_ranges("p1", 0, min_max(35, w, s))
+        self.set_parameter_ranges("p1", 0, n // 2 if s else min(35, w))
         self.set_parameter_ranges("l", 0, min_max(500, n - k, s))
 
     @optimal_parameter
@@ -251,15 +253,15 @@ class BJMMd2(SDAlgorithm):
 
         n, k, w = self.problem.get_parameters()
 
-        for p in range(new_ranges["p"]["min"], min(w // 2, new_ranges["p"]["max"]), 2):
-            for p1 in range(max(new_ranges["p1"]["min"], (p + 1) // 2), min(k // 2, new_ranges["p1"]["max"])):
-                ell_approx = 2 * log2(binom(k // 2, p1))
+        for p in range(new_ranges["p"]["min"], min(w // 2, new_ranges["p"]["max"]) + 1, 2):
+            for p1 in range(max(new_ranges["p1"]["min"], (p + 1) // 2), min(n // 2, new_ranges["p1"]["max"]) + 1):
+                ell_approx = 0 if self.full_domain else 2 * log2(binom(k // 2, p1))
                 for l in range(
-                        max(new_ranges["l"]["min"], int(ell_approx * 0.75)),
+                        max(new_ranges["l"]["min"], 0 if self.full_domain else int(ell_approx * 0.75)),
                         min(
-                            int(1.25 * ell_approx),
-                            n - k - (w - 2 * p),
-                            new_ranges["l"]["max"],
+                            n-k if self.full_domain else int(1.25 * ell_approx),
+                            n - k - (w - 2 * p) + 1,
+                            new_ranges["l"]["max"] + 1,
                         ),
                 ):
 
@@ -366,8 +368,8 @@ class BJMMd3(SDAlgorithm):
         s = self.full_domain
         self.set_parameter_ranges("p", 0, min_max(25, w, s))
         self.set_parameter_ranges("l", 0, min_max(400, n - k, s))
-        self.set_parameter_ranges("p2", 0, min_max(20, w, s))
-        self.set_parameter_ranges("p1", 0, min_max(10, w, s))
+        self.set_parameter_ranges("p2", 0, n // 2 if s else min(20, w))
+        self.set_parameter_ranges("p1", 0, n // 2 if s else min(10, w))
 
     @optimal_parameter
     def l(self):
@@ -453,16 +455,16 @@ class BJMMd3(SDAlgorithm):
         new_ranges = self._fix_ranges_for_already_set_parameters()
         n, k, w = self.problem.get_parameters()
 
-        for p in range(new_ranges["p"]["min"], min(w // 2, new_ranges["p"]["max"]), 2):
-            for l in range(new_ranges["l"]["min"], min(n - k - (w - 2 * p), new_ranges["l"]["max"])):
+        for p in range(new_ranges["p"]["min"], min(w // 2, new_ranges["p"]["max"]) + 1, 2):
+            for l in range(new_ranges["l"]["min"], min(n - k - (w - 2 * p), new_ranges["l"]["max"]) + 1):
                 for p2 in range(
                         max(new_ranges["p2"]["min"], p // 2 + ((p // 2) % 2)),
-                        new_ranges["p2"]["max"],
+                        new_ranges["p2"]["max"] + 1,
                         2,
                 ):
                     for p1 in range(
                             max(new_ranges["p1"]["min"], (p2 + 1) // 2),
-                            new_ranges["p1"]["max"],
+                            new_ranges["p1"]["max"] + 1,
                     ):
                         indices = {
                             "p": p,
@@ -495,6 +497,8 @@ class BJMMd3(SDAlgorithm):
         reps2 = (binom(par.p, par.p / 2) * binom(k1 - par.p, par.p2 - par.p / 2)) ** 2
         l2 = int(ceil(log2(reps2))) if reps2 != 1 else 0
 
+        if not (0 <= l1 <= l2 <= par.l):
+            return inf, inf
         L1234 = max(1, L12 ** 2 // 2 ** (l2 - l1))
         memory = log2((2 * L1 + L12 + L1234) + _mem_matrix(n, k, par.r))
         if memory > memory_bound:

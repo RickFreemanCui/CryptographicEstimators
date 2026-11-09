@@ -19,8 +19,10 @@
 
 
 from math import log2, comb, inf, ceil
+from functools import lru_cache
 
 
+@lru_cache(maxsize=32768)
 def binom(n: int, k: int):
     """Compute the binomial coefficient.
 

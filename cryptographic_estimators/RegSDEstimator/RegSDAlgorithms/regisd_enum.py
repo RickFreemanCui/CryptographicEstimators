@@ -42,8 +42,10 @@ class RegularISDEnum(RegSDAlgorithm):
         super(RegularISDEnum, self).__init__(problem, **kwargs)
         n, k, w = self.problem.get_parameters()
         self._name = "RegularISD-Enum"
-        self.set_parameter_ranges("p", 0, 30)
-        self.set_parameter_ranges("ell", 0, n-k)
+        self.set_parameter_ranges("p", 0, w)
+        self.set_parameter_ranges("ell", 0, n-k+w-1)
+
+        self._default_search_ranges = {key: value.copy() for key,value in self._parameter_ranges.items()}
 
     @optimal_parameter
     def p(self):
@@ -89,17 +91,22 @@ class RegularISDEnum(RegSDAlgorithm):
         new_ranges = self._fix_ranges_for_already_set_parameters()
 
         n, k, w = self.problem.get_parameters()
-        k_prime = k - w
-        for p in range(new_ranges["p"]["min"], min(w // 2, new_ranges["p"]["max"]+1), 2):
-            ell_approx = max(1, log2(binomial(r_int(w / 2), p // 2)) +log2(k_prime / w) * (p / 2))
-            ell_min = r_int(ell_approx * 0.5)
-            ell_max = min(r_int(ell_approx * 1.5), n - k_prime)
-
-            for ell in range(max(new_ranges["ell"]["min"],ell_min), min(ell_max, new_ranges["ell"]["max"]+1)):
+        for p in range(new_ranges["p"]["min"] + new_ranges["p"]["min"] % 2,
+                       min(w, new_ranges["p"]["max"]) + 1, 2):
+            for ell in range(new_ranges["ell"]["min"], min(n-k+w-1, new_ranges["ell"]["max"]) + 1):
                 indices = {"p": p, "ell": ell}
-                if self._are_parameters_invalid(indices):
-                    continue
-                yield indices
+                if not self._are_parameters_invalid(indices):
+                    yield indices
+
+    def _find_optimal_parameters(self):
+        from ..reliable import balanced_regular
+        if (self._optimal_parameters or self._memory_access != 0
+                or self.problem.memory_bound != float("inf")
+                or self._parameter_ranges != self._default_search_ranges):
+            return super()._find_optimal_parameters()
+        n, k, w = self.problem.get_parameters()
+        self.search_report = balanced_regular(n, k, w, depth=1)
+        self._optimal_parameters.update(self.search_report["best"]["parameters"])
 
     def _compute_time_and_memory_complexity(self, parameters: dict):
         """Return the time complexity of the algorithm for a given set of parameters.
@@ -107,24 +114,7 @@ class RegularISDEnum(RegSDAlgorithm):
         Args:
             parameters (dict): Dictionary including the parameters.
         """
+        from ..reliable import balanced_point
         n, k, w = self.problem.get_parameters()
-        ell = parameters["ell"]
-        p = parameters["p"]
-        b = n//w
-
-        # add parity-checks
-        k_prime = k - w
-
-        v = (k_prime + ell) / w  # number of coordinates per block
-
-        # success probability
-        p_iter = log2(binomial(floor(w / 2), r_int(p / 2))) + log2(binomial(ceil(w / 2), r_int(p / 2))) + log2(
-            v / b) * p + log2(1 - v / b) * (w - p)
-
-        # cost of one iteration
-        L = log2(binomial(r_int(w / 2), p // 2)) + log2(v) * (p / 2)
-        T_iter = max(log2(n - k_prime) * 2, 1 + L, L * 2 - ell)
-
-        # overall cost
-        time = T_iter - p_iter
-        return time, L
+        time, memory = balanced_point(n,k,w,parameters,depth=1)
+        return time-log2(n), memory-log2(n)

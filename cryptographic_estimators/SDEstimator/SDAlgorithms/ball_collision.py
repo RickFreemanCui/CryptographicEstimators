@@ -64,7 +64,7 @@ class BallCollision(SDAlgorithm):
         self._name = "BallCollision"
         s = self.full_domain
         self.set_parameter_ranges("l", 0, min_max(300, n - k, s))
-        self.set_parameter_ranges("pl", 0, min_max(10, w, s))
+        self.set_parameter_ranges("pl", 0, w // 2 if s else min(10, w))
         self.set_parameter_ranges("r", 0, n - k)
 
         self.scipy_model = BallCollisionScipyModel
@@ -134,8 +134,8 @@ class BallCollision(SDAlgorithm):
         """Generator which yields on each call a new set of valid parameters based on the `_parameter_ranges` and already set parameters in `_optimal_parameters`."""
         new_ranges = self._fix_ranges_for_already_set_parameters()
         n, k, w = self.problem.get_parameters()
-        start_p = new_ranges["p"]["min"] + (new_ranges["p"]["min"] % 2)
-        for p in range(start_p, min(w // 2, new_ranges["p"]["max"]) + 1, 2):
+        start_p = new_ranges["p"]["min"] if self.full_domain else new_ranges["p"]["min"] + (new_ranges["p"]["min"] % 2)
+        for p in range(start_p, min(w // 2, new_ranges["p"]["max"]) + 1, 1 if self.full_domain else 2):
             for l in range(
                 new_ranges["l"]["min"],
                 min(n - k - (w - 2 * p), new_ranges["l"]["max"]) + 1,

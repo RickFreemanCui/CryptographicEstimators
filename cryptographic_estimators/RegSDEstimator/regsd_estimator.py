@@ -44,6 +44,14 @@ class RegSDEstimator(BaseEstimator):
             **kwargs
         )
 
+    def reliable_estimate(self, **search_limits):
+        """Strict finite-domain binary report; unlike table(), propagates failures."""
+        from .reliable import estimate
+        if self.problem.memory_bound != float("inf") or any(a._memory_access != 0 for a in self.algorithms()):
+            raise ValueError("Strict policy requires unlimited memory and memory_access=0")
+        n, k, w = self.problem.get_parameters()
+        return estimate(n, k, w, **search_limits)
+
     def table(self, show_quantum_complexity=0, show_tilde_o_time=0,
               show_all_parameters=0, precision=1, truncate=0, *args, **kwargs):
         """Print table describing the complexity of each algorithm and its optimal parameters.

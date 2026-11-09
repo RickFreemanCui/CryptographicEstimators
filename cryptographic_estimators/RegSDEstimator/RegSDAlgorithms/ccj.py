@@ -25,6 +25,16 @@ from ..regsd_helper import r_int
 from math import log2, ceil, inf
 
 
+def _log2_sum_exp2(values):
+    finite_values = [value for value in values if value != -inf]
+    if not finite_values:
+        return -inf
+    max_value = max(finite_values)
+    if max_value == inf:
+        return inf
+    return max_value + log2(sum(2 ** (value - max_value) for value in finite_values))
+
+
 class CCJ(RegSDAlgorithm):
     def __init__(self, problem: RegSDProblem, **kwargs):
         """Construct an instance of CCJ estimator from [CCJ23]_.
@@ -44,7 +54,7 @@ class CCJ(RegSDAlgorithm):
         super(CCJ, self).__init__(problem, **kwargs)
         n, k, w = self.problem.get_parameters()
         self._name = "CCJ"
-        self.set_parameter_ranges("ell", 0, min(k + w, n))
+        self.set_parameter_ranges("ell", 0, n - k)
 
     @optimal_parameter
     def ell(self):
@@ -69,17 +79,8 @@ class CCJ(RegSDAlgorithm):
 
         n, k, w = self.problem.get_parameters()
 
-        # we first find a suitable range for the optimal value of ell
-        k_tilde_approx = k - (1 - k / n) / (1 - w / n) * w
-        L1_approx = log2(n / w) * (w * k_tilde_approx / (2 * n))
-        ell_approx = L1_approx
-        ell_min = ceil(ell_approx * 0.75)
-        ell_max = min(r_int(ell_approx * 1.5), n - k)
-        for ell in range(max(new_ranges["ell"]["min"], ell_min), min(ell_max, new_ranges["ell"]["max"] + 1)):
-            indices = {"ell": ell}
-            if self._are_parameters_invalid(indices):
-                continue
-            yield indices
+        for ell in range(new_ranges["ell"]["min"], min(n-k,new_ranges["ell"]["max"]) + 1):
+            yield {"ell": ell}
 
     def _compute_time_and_memory_complexity(self, parameters: dict):
         """Return the time complexity of the algorithm for a given set of parameters.
@@ -93,12 +94,16 @@ class CCJ(RegSDAlgorithm):
         if ell > (n - k_tilde):
             return inf, inf
 
-        # cost of one iteration
-        L = (n / w) ** (w * (k_tilde + ell) / (2 * n))
-        num_coll = L ** 2 * 2 ** -ell
+        # Cost of one iteration, computed in log-domain to avoid overflow for
+        # large RegSD instances.
+        log_L = log2(n / w) * (w * (k_tilde + ell) / (2 * n))
+        log_num_coll = 2 * log_L - ell
+
+        log_terms = [1 + log_L, log_num_coll]
+        if n > k_tilde:
+            log_terms.append(2 * log2(n - k_tilde))
 
         # overall cost
-        time = log2((n - k_tilde) ** 2 + (2 * L + num_coll))
+        time = _log2_sum_exp2(log_terms)
 
-        return time, log2(L)
-
+        return time, log_L

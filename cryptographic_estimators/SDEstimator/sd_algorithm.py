@@ -23,6 +23,7 @@ from ..base_algorithm import BaseAlgorithm, optimal_parameter
 from ..SDEstimator.sd_helper import _optimize_m4ri
 from .sd_problem import SDProblem
 from math import log2, inf
+from ..search_contract import SearchBudget
 
 
 class SDAlgorithm(BaseAlgorithm):
@@ -41,6 +42,9 @@ class SDAlgorithm(BaseAlgorithm):
         self.workfactor_accuracy = kwargs.get("workfactor_accuracy", 1)
         self.scipy_model = None
         self.full_domain = kwargs.get("full_domain", False)
+        if self.full_domain:
+            self._variable_parameter_ranges = False
+        self._search_limits = {key: kwargs.get(key) for key in ("max_evaluations", "max_seconds")}
         self._current_minimum_for_early_abort = inf
         n, k, _ = self.problem.get_parameters()
         self.set_parameter_ranges("r", 0, n - k)
@@ -80,9 +84,11 @@ class SDAlgorithm(BaseAlgorithm):
         """Enumerates over all valid parameter configurations within the ranges of the optimization and saves the best result in `self._optimal_parameter`."""
         _ = self.r()
         time = inf
+        budget = SearchBudget(self.__class__.__name__, {"ranges": self._parameter_ranges, "full_domain": self.full_domain}, **self._search_limits)
         while True:
             stop = True
             for params in self._valid_choices():
+                budget.tick()
                 if self._are_parameters_invalid(params):
                     continue
                 tmp_time, tmp_memory = self._time_and_memory_complexity(params)
@@ -94,6 +100,7 @@ class SDAlgorithm(BaseAlgorithm):
 
                 if tmp_time < time and tmp_memory < self.problem.memory_bound:
                     time, memory = tmp_time, tmp_memory
+                    budget.consider(tmp_time, params, tmp_memory)
                     self._current_minimum_for_early_abort = tmp_time
 
                     for i in params:
@@ -105,6 +112,9 @@ class SDAlgorithm(BaseAlgorithm):
             if stop:
                 break
         self._current_minimum_for_early_abort = inf
+        self.search_report = budget.finish()
+        if not self.full_domain or self.__class__.__name__ not in ("BJMMd2", "BJMMd3", "BallCollision"):
+            self.search_report["status"] = "heuristic"
 
     def _find_optimal_tilde_o_parameters(self):
         """Enumerates all valid parameters within the given ranges to find the optimal one asymptotically. Calls the C interface."""
@@ -112,10 +122,13 @@ class SDAlgorithm(BaseAlgorithm):
 
     def _adjust_parameter_ranges(self):
         """Readjust the boundaries of the `ESTIMATE` optimization routine if the optimization detects that it runs into one or more of the boundaries, these boundaries will be increased/decreased by `self._adjust_radius`."""
+        before = {name: bounds.copy() for name, bounds in self._parameter_ranges.items()}
         kept_old_ranges = True
         r = self._adjust_radius
 
         for i in self._optimal_parameters_methods:
+            if i.__name__ == "r":
+                continue  # M4RI r is optimized independently, not by this box search.
             ranges = self._parameter_ranges[i.__name__]
             current_min = ranges["min"]
             current_max = ranges["max"]
@@ -133,7 +146,7 @@ class SDAlgorithm(BaseAlgorithm):
 
             if current_min == ranges["min"] and current_max == ranges["max"]:
                 kept_old_ranges = True
-        return kept_old_ranges
+        return before == self._parameter_ranges
 
     def _time_and_memory_complexity(self, parameters: dict, verbose_information=None):
         """Computes time and memory complexity for given parameters."""
